@@ -1,13 +1,18 @@
 # Cat Pizza Challenge
 
 a simple solution to the "Cheshire Cat AI Pizza Challenge"
+.. from today the cat also orders pizzas!
 
-<img src="./logo/logo0.jpg" width=400>
+<img src="./img/thumb.jpg" width=400>
 
 
 ## Architecture diagram
 
 <img src="./img/pizza-challenge.jpg" width=1200>
+
+inspired by: 
+- <a target="new" href="https://github.com/Pingdred/pizza_delivery">Emanuele Morrone - Pizza Delivery</a>
+- <a target="new" href="https://colab.research.google.com/drive/1asxfC-tsCjfmpWMqEi4x-zflg8CwnapM?usp=sharing">Sam Witteveen - Langchain creating and Parsing a Conversational Form</a>
 
 
 [![awesome plugin](https://custom-icon-badges.demolab.com/static/v1?label=&message=awesome+plugin&color=383938&style=for-the-badge&logo=cheshire_cat_ai)](https://)  
