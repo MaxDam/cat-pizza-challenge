@@ -4,8 +4,10 @@ from typing import Dict
 
 from cat.log import log
 
-from cat.plugins.pizza_delivery.form import Form
-KEY = "pizza_delivery"
+from .form import Form
+
+
+KEY = "pizza_challenge"
 
 menu = [
             "Margherita",
