@@ -1,10 +1,10 @@
 {
     "name": "Cat Pizza Challenge",
     "version": "0.0.1",
-    "description": "Description of cat_pizza_challenge.",
-    "author_name": "Me",
-    "author_url": "https://mywebsite.me",
-    "plugin_url": "https://github.com/my_name/cat_pizza_challenge",
+    "description": "PIZZA ORDER CHALLENGE! From today the cat also orders pizzas!",
+    "author_name": "Massimiliano D'Amico",
+    "author_url": "https://www.linkedin.com/in/massimilianodamico",
+    "plugin_url": "https://github.com/MaxDam/cat-pizza-challenge",
     "tags": "cat, template, example",
-    "thumb": "https://raw.githubusercontent.com/my_repo_path/cat_pizza_challenge.png"
+    "thumb": "https://maxdam.github.io/cat-pizza-challenge/logo/logo0.jpg"
 }
