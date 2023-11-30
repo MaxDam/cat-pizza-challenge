@@ -11,9 +11,9 @@ a simple solution to the "Cheshire Cat AI Pizza Challenge"
 <img src="./img/pizza-challenge.jpg" width=1200>
 
 inspired by: 
-- <a target="_blank" href="https://github.com/Pingdred/pizza_delivery">Emanuele Morrone - Pizza Delivery</a>
-- <a target="_blank" href="https://www.youtube.com/watch?app=desktop&si=fvCdI6V7V7WNuRxt&v=IT93On2LB5k">Sam Witteveen - HOW to Make Conversational Form with LangChain</a>
-
+- <a href="https://github.com/Pingdred/pizza_delivery">Emanuele Morrone - Pizza Delivery</a>
+- <a href="https://www.youtube.com/watch?app=desktop&si=fvCdI6V7V7WNuRxt&v=IT93On2LB5k">Sam Witteveen - HOW to Make Conversational Form with LangChain</a>
+<br><br>
 
 [![awesome plugin](https://custom-icon-badges.demolab.com/static/v1?label=&message=awesome+plugin&color=383938&style=for-the-badge&logo=cheshire_cat_ai)](https://)  
 [![Awesome plugin](https://custom-icon-badges.demolab.com/static/v1?label=&message=Awesome+plugin&color=000000&style=for-the-badge&logo=cheshire_cat_ai)](https://)  
