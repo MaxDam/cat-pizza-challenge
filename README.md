@@ -1,4 +1,14 @@
-# My plugin
+# Cat Pizza Challenge
+
+a simple solution to the "Cheshire Cat AI Pizza Challenge"
+
+<img src="./logo/logo0.jpg" width=400>
+
+
+## Architecture diagram
+
+<img src="./img/pizza-challenge.jpg" width=1200>
+
 
 [![awesome plugin](https://custom-icon-badges.demolab.com/static/v1?label=&message=awesome+plugin&color=383938&style=for-the-badge&logo=cheshire_cat_ai)](https://)  
 [![Awesome plugin](https://custom-icon-badges.demolab.com/static/v1?label=&message=Awesome+plugin&color=000000&style=for-the-badge&logo=cheshire_cat_ai)](https://)  
