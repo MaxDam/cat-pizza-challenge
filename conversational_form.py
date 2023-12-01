@@ -1,14 +1,14 @@
 import json
 from cat.log import log
-from pydantic import ValidationError
 from langchain.chains import create_tagging_chain_pydantic
+from pydantic import BaseModel
 
-class Form:
+class ConversationalForm:
 
-    def __init__(self, model, cat):
+    def __init__(self, model, cat, lang):
         self.model = model
         self.cat = cat
-        self.language = "Italian"
+        self.language = lang
 
 
     # Check if the form is completed
@@ -42,7 +42,7 @@ class Form:
         
         # Prompt
         prompt = f"""{prefix}
-        Create a question for the user (translating everything into {self.language} language), 
+        Create a question for the user (translating everything in {self.language} language), 
         below are some things to ask the user in a conversational and confidential way, to complete the pizza order.
         You should only ask one question at a time even if you don't get all the information
         don't ask how to list! Don't say hello to the user! Don't say hi.
@@ -61,17 +61,9 @@ class Form:
     # Updates the form with the information extracted from the user's response
     def update_from_user_response(self):
 
-        '''
         # Extract new info
-        details = self._extract_info()
-        print(f'_extract_info:\n{details}')
-        '''
-
-        # Extracted new informations from the user's response
-        user_message = self.cat.working_memory["user_message_json"]["text"]
-        chain = create_tagging_chain_pydantic(self.model, self.cat.llm)
-        user_response_json = chain.run(user_message)
-        print(f'user response json:\n{user_response_json}')
+        user_response_json = self._extract_info()
+        # user_response_json = self._extract_info_new()
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}
@@ -81,19 +73,16 @@ class Form:
         if new_model.model_dump() == self.model.model_dump():
             return False
 
-        # Validate new_model
-        try:
-            self.model.model_validate(new_model.model_dump())
-        except ValidationError as e:
-            for error_message in e.errors():
-                return error_message["msg"]
+        # Validate new_model (raises ValidationError exception on error)
+        self.model.model_validate(new_model.model_dump())
 
         # Overrides the current model with the new_model
         self.model = self.model.model_construct(**new_model.model_dump())
         print(f'updated model:\n{self.model.model_dump_json(indent=4)}')
         return True
 
-    '''
+
+    
     # Extracted new informations from the user's response
     def _extract_info(self):
 
@@ -130,5 +119,18 @@ class Form:
         Updated JSON:"""
         
         json_str = self.cat.llm(prompt)
-        return json.loads(json_str)
-    '''
+        user_response_json = json.loads(json_str)
+        print(f'user response json:\n{user_response_json}')
+        return user_response_json
+
+
+    # Extracted new informations from the user's response
+    def _extract_info_new(self):
+
+        # Extracted new informations from the user's response
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        chain = create_tagging_chain_pydantic(self.model, self.cat.llm)
+        user_response_json = chain.run(user_message)
+        print(f'user response json:\n{user_response_json}')
+        return user_response_json
+    
