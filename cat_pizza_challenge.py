@@ -43,7 +43,7 @@ class PizzaOrder(BaseModel):
         description="This is the telephone number with which to contact the user in case of need.",
     )
     '''
-
+    '''
     @field_validator("pizza_type")
     @classmethod
     def validate_pizza_type(cls, pizza_type: str):
@@ -56,18 +56,18 @@ class PizzaOrder(BaseModel):
 
         if pizza_type not in pizza_types:
             raise ValueError(f"{pizza_type} is not present in the menù (translating everything in {language} language)")
-
+    '''
 
 # Order pizza start intent
 @tool(return_direct=True)
 def start_order_pizza_intent(details, cat):
     '''I would like to order a pizza
-    I'll take a Margherita pizza'''
+    I'll take a pizza'''
 
     log.critical("\n ----------- INTENT START ----------- \n")
 
     # create a new conversational form
-    cform = ConversationalForm(model=PizzaOrder(), cat=cat, lang=language)
+    cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
     cat.working_memory[KEY] = cform
 
     _, response = execute_dialogue(cform, cat)

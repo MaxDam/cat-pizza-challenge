@@ -16,7 +16,7 @@ class ConversationalForm:
     # Check if the form is completed
     def is_completed(self):
         for k,v in self.model.model_dump().items():
-            if v is None:
+            if v in [None, ""]:
                 return False
         return True
 
@@ -64,9 +64,8 @@ class ConversationalForm:
     def update_from_user_response(self):
 
         # Extract new info
-        user_response_json = self._extract_info()
-        # user_response_json = self._extract_info_new1()
-        # user_response_json = self._extract_info_new2()
+        #user_response_json = self._extract_info()
+        user_response_json = self._extract_info_new()
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}
@@ -123,22 +122,11 @@ class ConversationalForm:
         json_str = self.cat.llm(prompt)
         user_response_json = json.loads(json_str)
         print(f'user response json:\n{user_response_json}')
-        return user_response_json
+        return user_response_json    
 
 
     # Extracted new informations from the user's response
-    def _extract_info_new1(self):
-
-        # Extracted new informations from the user's response
-        user_message = self.cat.working_memory["user_message_json"]["text"]
-        chain = create_tagging_chain_pydantic(type(self.model), self.cat._llm)
-        user_response_json = chain.run(user_message)
-        print(f'user response json:\n{user_response_json}')
-        return user_response_json
-    
-
-    # Extracted new informations from the user's response
-    def _extract_info_new2(self):
+    def _extract_info_new(self):
         parser = PydanticOutputParser(pydantic_object=type(self.model))
         prompt = PromptTemplate(
             template="Answer the user query.\n{format_instructions}\n{query}\n",
@@ -146,10 +134,13 @@ class ConversationalForm:
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
         print(f'get_format_instructions:\n{parser.get_format_instructions()}')
+        
         user_message = self.cat.working_memory["user_message_json"]["text"]
         _input = prompt.format_prompt(query=user_message)
         output = self.cat.llm(_input.to_string())
-        json_str = parser.parse(output).json()
-        user_response_json = json.loads(json_str)
+        print(f"output: {output}")
+
+        #user_response_json = parser.parse(output).dict()
+        user_response_json = json.loads(output)
         print(f'user response json:\n{user_response_json}')
         return user_response_json
