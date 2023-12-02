@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from typing import Dict, Optional
 from cat.log import log
 from .conversational_form import ConversationalForm
+import random
 
 KEY = "pizza_challenge"
 
@@ -142,12 +143,27 @@ def execute_dialogue(cform, cat):
 
 # Complete the action
 def execute_action(cform):
-    return f"""
-    PIZZA CHALLENGE - ORDER COMPLETED                     
-                                                                            
-    Pizza Type:   {cform.model.pizza_type}                                  
-    Address:      {cform.model.address}                                     
-    Phone Number: {cform.model.phone}                                       
+    x = random.randint(0, 6)
 
-    Thanks for your order.. your pizza is on its way!                                                           
-    """
+    # Crea il nome del file con il formato "pizzaX.jpg"
+    filename = f'pizza{x}.jpg'
+    result = "<h3>PIZZA CHALLENGE - ORDER COMPLETED<h3><br>" 
+    result += "<table border=0>"
+    result += "<tr>"
+    result += "   <td>Pizza Type</td>"
+    result += f"  <td>{cform.model.pizza_type}</td>"
+    result += "</tr>"
+    result += "<tr>"
+    result += "   <td>Address</td>"
+    result += f"  <td>{cform.model.address}</td>"
+    result += "</tr>"
+    result += "<tr>"
+    result += "   <td>Phone Number</td>"
+    result += f"  <td>{cform.model.phone}</td>"
+    result += "</tr>"
+    result += "</table>"
+    result += "<br>"                                                                                                     
+    result += "Thanks for your order.. your pizza is on its way!"
+    result += "<br><br>"
+    result += f"<img style='width:400px' src='https://maxdam.github.io/cat-pizza-challenge/img/order/pizza{random.randint(0, 6)}.jpg'>"
+    return result

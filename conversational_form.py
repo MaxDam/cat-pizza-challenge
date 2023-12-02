@@ -85,7 +85,6 @@ class ConversationalForm:
         return True
 
 
-    
     # Extracted new informations from the user's response
     def _extract_info(self):
 
@@ -132,7 +131,7 @@ class ConversationalForm:
 
         # Extracted new informations from the user's response
         user_message = self.cat.working_memory["user_message_json"]["text"]
-        chain = create_tagging_chain_pydantic(type(self.model), self.cat.llm)
+        chain = create_tagging_chain_pydantic(type(self.model), self.cat._llm)
         user_response_json = chain.run(user_message)
         print(f'user response json:\n{user_response_json}')
         return user_response_json
@@ -154,4 +153,3 @@ class ConversationalForm:
         user_response_json = json.loads(json_str)
         print(f'user response json:\n{user_response_json}')
         return user_response_json
-    
