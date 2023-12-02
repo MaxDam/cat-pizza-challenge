@@ -1,6 +1,8 @@
 import json
 from cat.log import log
 from langchain.chains import create_tagging_chain_pydantic
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
 from pydantic import BaseModel
 
 class ConversationalForm:
@@ -63,7 +65,8 @@ class ConversationalForm:
 
         # Extract new info
         user_response_json = self._extract_info()
-        # user_response_json = self._extract_info_new()
+        # user_response_json = self._extract_info_new1()
+        # user_response_json = self._extract_info_new2()
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}
@@ -125,12 +128,30 @@ class ConversationalForm:
 
 
     # Extracted new informations from the user's response
-    def _extract_info_new(self):
+    def _extract_info_new1(self):
 
         # Extracted new informations from the user's response
         user_message = self.cat.working_memory["user_message_json"]["text"]
-        chain = create_tagging_chain_pydantic(self.model, self.cat.llm)
+        chain = create_tagging_chain_pydantic(type(self.model), self.cat.llm)
         user_response_json = chain.run(user_message)
+        print(f'user response json:\n{user_response_json}')
+        return user_response_json
+    
+
+    # Extracted new informations from the user's response
+    def _extract_info_new2(self):
+        parser = PydanticOutputParser(pydantic_object=type(self.model))
+        prompt = PromptTemplate(
+            template="Answer the user query.\n{format_instructions}\n{query}\n",
+            input_variables=["query"],
+            partial_variables={"format_instructions": parser.get_format_instructions()},
+        )
+        print(f'get_format_instructions:\n{parser.get_format_instructions()}')
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        _input = prompt.format_prompt(query=user_message)
+        output = self.cat.llm(_input.to_string())
+        json_str = parser.parse(output).json()
+        user_response_json = json.loads(json_str)
         print(f'user response json:\n{user_response_json}')
         return user_response_json
     
