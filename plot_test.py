@@ -1,26 +1,21 @@
 from cat.mad_hatter.decorators import hook, tool
-import base64
-from io import BytesIO
-import numpy as np
+import numpy as np 
 import matplotlib.pyplot as plt
-
+from datetime import datetime
 
 @tool(return_direct=True)
-def get_plot_intent(input, cat):
+def get_plot_intent2(input, cat):
     '''get plot'''
-    x = np.arange(0, 2*np.pi, 0.1)
-    y = np.sin(x)
+    values = np.random.randint(1, 10, 5)
     fig, ax = plt.subplots()
-    ax.plot(x, y)
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_title('Sinusoid')
-    tmpfile = BytesIO()
-    fig.savefig(tmpfile, format='png')
-    encoded = base64.b64encode(tmpfile.getvalue()).decode('utf-8')
-    html = "<img src='data:image/png;base64,{}'>".format(encoded)
-    return html
-
+    indici = np.arange(len(values))
+    ax.bar(indici, values, color='blue')
+    ax.set_xlabel('Index')
+    ax.set_ylabel('Value')
+    ax.set_title('Random Graph')
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    fig.savefig(f'cat/static/plot-{timestamp}.svg')
+    return f"<img style='width:400px' src='http://localhost:1865/static/plot-{timestamp}.svg'>"
 
 @tool(return_direct=True)
 def get_image(input, cat):
