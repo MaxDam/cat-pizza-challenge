@@ -2,6 +2,9 @@ from cat.mad_hatter.decorators import hook, tool
 import numpy as np 
 import matplotlib.pyplot as plt
 from datetime import datetime
+from cat.utils import get_static_url, get_static_path
+import os
+
 
 @tool(return_direct=True)
 def get_plot_intent2(input, cat):
@@ -14,10 +17,27 @@ def get_plot_intent2(input, cat):
     ax.set_ylabel('Value')
     ax.set_title('Random Graph')
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    fig.savefig(f'cat/static/plot-{timestamp}.svg')
-    return f"<img style='width:400px' src='http://localhost:1865/static/plot-{timestamp}.svg'>"
+    filename = f"plot-{timestamp}.svg"
+    
+    #fig.savefig(f'cat/static/plot-{timestamp}.svg')
+    #return f"<img style='width:400px' src='http://localhost:1865/static/plot-{timestamp}.svg'>"
+    
+    delete_previous_files_by_prefix("plot-")
+    fig.savefig(f'{get_static_url()}/{filename}')
+    return f"<img style='width:400px' src='{get_static_path()}/{filename}'>"
+
 
 @tool(return_direct=True)
 def get_image(input, cat):
     '''get image'''
     return "<img style='width:400px' src='https://maxdam.github.io/cat-pizza-challenge/img/thumb.jpg'>"
+
+
+# delete previous files
+def delete_previous_files_by_prefix(prefix):
+    folder = get_static_url()
+    files = os.listdir(folder)
+    for file in files:
+        if file.startswith(prefix):
+            file_path = os.path.join(folder, file)
+            os.remove(file_path)
