@@ -1,5 +1,6 @@
 from cat.mad_hatter.decorators import hook, tool
 from pydantic import BaseModel, Field, ValidationError, field_validator
+import enum
 from typing import Dict, Optional
 from cat.log import log
 from .conversational_form import ConversationalForm
@@ -11,7 +12,7 @@ language = "Italian"
 
 menu = {
     "Margherita": "Pomodoro, mozzarella fresca, basilico.",
-    "Peperoni": "Pomodoro, mozzarella, pepperoni.",
+    "Peperoni": "Pomodoro, mozzarella, peperoni.",
     "Funghi e Prosciutto": "Pomodoro, mozzarella, funghi, prosciutto.",
     "Quattro Formaggi": "Gorgonzola, mozzarella, parmigiano, taleggio.",
     "Capricciosa: Pomodoro": "mozzarella, prosciutto, funghi, carciofi, olive.",
@@ -22,27 +23,41 @@ menu = {
     "Prosciutto e Rucola": "Pomodoro, mozzarella, prosciutto crudo, rucola, scaglie di parmigiano."
 }
 
+
 # Pizza order object
 class PizzaOrder(BaseModel):
 
+    pizza_type: str = Field(
+        default=None,
+        description="This is the type of pizza the user wants to order.",
+        examples=[
+            ("Margherita pizza", "Margherita"),
+            ("I like Capricciosa", "Capricciosa")
+        ],
+    )
+    address: str = Field(
+        default=None,
+        description="This is the address to which the user wants the pizza delivered.",
+        examples=[
+            ("My address is via Pia 22", "via Pia 22"),
+            ("I live in via libertà, number 14", "via libertà 14")
+        ],
+    )
+    phone: str = Field(
+        default=None,
+        description="This is the telephone number with which to contact the user in case of need.",
+        examples=[
+            ("My telephon number is 333123123", "333123123"),
+            ("the number is 3493366443", "3493366443")
+        ],
+    )
+
+    '''
     pizza_type: str | None = None
     address: str | None = None
     phone: str | None = None
-
     '''
-    pizza_type: str = Field(
-        ...,
-        description="This is the type of pizza the user wants to order.",
-    )
-    address: str = Field(
-        ...,
-        description="This is the address to which the user wants the pizza delivered.",
-    )
-    phone: str = Field(
-        ...,
-        description="This is the telephone number with which to contact the user in case of need.",
-    )
-    '''
+    
     '''
     @field_validator("pizza_type")
     @classmethod
@@ -56,7 +71,8 @@ class PizzaOrder(BaseModel):
 
         if pizza_type not in pizza_types:
             raise ValueError(f"{pizza_type} is not present in the menù (translating everything in {language} language)")
-    '''
+    '''   
+
 
 # Order pizza start intent
 @tool(return_direct=True)
@@ -67,7 +83,8 @@ def start_order_pizza_intent(details, cat):
     log.critical("\n ----------- INTENT START ----------- \n")
 
     # create a new conversational form
-    cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
+    cform = ConversationalForm(model=PizzaOrder(), cat=cat, lang=language)
+    #cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
     cat.working_memory[KEY] = cform
 
     _, response = execute_dialogue(cform, cat)

@@ -4,6 +4,7 @@ from langchain.chains import create_tagging_chain_pydantic
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel
+from kor import create_extraction_chain, from_pydantic, Object, Text
 
 class ConversationalForm:
 
@@ -64,8 +65,9 @@ class ConversationalForm:
     def update_from_user_response(self):
 
         # Extract new info
-        #user_response_json = self._extract_info()
-        user_response_json = self._extract_info_new()
+        #user_response_json = self._extract_info_from_scratch()
+        #user_response_json = self._extract_info_by_pydantic()
+        user_response_json = self._extract_info_by_kor()
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}
@@ -84,8 +86,41 @@ class ConversationalForm:
         return True
 
 
-    # Extracted new informations from the user's response
-    def _extract_info(self):
+
+    # Extracted new informations from the user's response (by pydantic)
+    def _extract_info_by_pydantic(self):
+        parser = PydanticOutputParser(pydantic_object=type(self.model))
+        prompt = PromptTemplate(
+            template="Answer the user query.\n{format_instructions}\n{query}\n",
+            input_variables=["query"],
+            partial_variables={"format_instructions": parser.get_format_instructions()},
+        )
+        print(f'get_format_instructions:\n{parser.get_format_instructions()}')
+        
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        _input = prompt.format_prompt(query=user_message)
+        output = self.cat.llm(_input.to_string())
+        print(f"output: {output}")
+
+        #user_response_json = parser.parse(output).dict()
+        user_response_json = json.loads(output)
+        print(f'user response json:\n{user_response_json}')
+        return user_response_json
+
+
+    # Extracted new informations from the user's response (by kor)
+    def _extract_info_by_kor(self):
+        schema, validator = from_pydantic(type(self.model))   
+        chain = create_extraction_chain(self.cat._llm, schema, encoder_or_encoder_class="json", validator=validator)
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        output = chain.run(user_message)["validated_data"]
+        user_response_json = output.dict()
+        print(f'user response json:\n{user_response_json}')
+        return user_response_json
+
+
+    # Extracted new informations from the user's response (from sratch)
+    def _extract_info_from_scratch(self):
 
         # Prompt
         user_message = self.cat.working_memory["user_message_json"]["text"]
@@ -122,25 +157,9 @@ class ConversationalForm:
         json_str = self.cat.llm(prompt)
         user_response_json = json.loads(json_str)
         print(f'user response json:\n{user_response_json}')
-        return user_response_json    
-
-
-    # Extracted new informations from the user's response
-    def _extract_info_new(self):
-        parser = PydanticOutputParser(pydantic_object=type(self.model))
-        prompt = PromptTemplate(
-            template="Answer the user query.\n{format_instructions}\n{query}\n",
-            input_variables=["query"],
-            partial_variables={"format_instructions": parser.get_format_instructions()},
-        )
-        print(f'get_format_instructions:\n{parser.get_format_instructions()}')
-        
-        user_message = self.cat.working_memory["user_message_json"]["text"]
-        _input = prompt.format_prompt(query=user_message)
-        output = self.cat.llm(_input.to_string())
-        print(f"output: {output}")
-
-        #user_response_json = parser.parse(output).dict()
-        user_response_json = json.loads(output)
-        print(f'user response json:\n{user_response_json}')
         return user_response_json
+
+
+# TODO:
+# https://www.askmarvin.ai/welcome/what_is_marvin/
+# https://github.com/jxnl/instructor
