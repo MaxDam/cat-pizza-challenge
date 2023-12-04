@@ -1,45 +1,64 @@
 from cat.mad_hatter.decorators import hook, tool
-from pydantic import BaseModel, Field, field_validator
-from typing import Dict
-
+from pydantic import BaseModel, Field, ValidationError, field_validator
+import enum
+from typing import Dict, Optional
 from cat.log import log
-
-from .form import Form
-
+from .conversational_form import ConversationalForm
+import random
 
 KEY = "pizza_challenge"
 
-menu = [
-            "Margherita",
-            "Marinara",
-            "Boscaiola",
-            "Napoletana",
-            "Capricciosa",
-            "Diavola",
-            "Ortolana"
-        ]
+language = "Italian"
+
+menu = {
+    "Margherita": "Pomodoro, mozzarella fresca, basilico.",
+    "Peperoni": "Pomodoro, mozzarella, peperoni.",
+    "Funghi e Prosciutto": "Pomodoro, mozzarella, funghi, prosciutto.",
+    "Quattro Formaggi": "Gorgonzola, mozzarella, parmigiano, taleggio.",
+    "Capricciosa: Pomodoro": "mozzarella, prosciutto, funghi, carciofi, olive.",
+    "Vegetariana: Pomodoro": "mozzarella, peperoni, cipolla, olive, melanzane.",
+    "Bufalina: Pomodoro": "mozzarella di bufala, pomodorini, basilico.",
+    "Diavola: Pomodoro": "mozzarella, salame piccante, peperoncino.",
+    "Pescatora": "Pomodoro, mozzarella, frutti di mare (cozze, vongole, gamberi).",
+    "Prosciutto e Rucola": "Pomodoro, mozzarella, prosciutto crudo, rucola, scaglie di parmigiano."
+}
+
 
 # Pizza order object
 class PizzaOrder(BaseModel):
+
+    pizza_type: str = Field(
+        default=None,
+        description="This is the type of pizza the user wants to order.",
+        examples=[
+            ("Margherita pizza", "Margherita"),
+            ("I like Capricciosa", "Capricciosa")
+        ],
+    )
+    address: str = Field(
+        default=None,
+        description="This is the address to which the user wants the pizza delivered.",
+        examples=[
+            ("My address is via Pia 22", "via Pia 22"),
+            ("I live in via libertà, number 14", "via libertà 14")
+        ],
+    )
+    phone: str = Field(
+        default=None,
+        description="This is the telephone number with which to contact the user in case of need.",
+        examples=[
+            ("My telephon number is 333123123", "333123123"),
+            ("the number is 3493366443", "3493366443")
+        ],
+    )
+
+    '''
     pizza_type: str | None = None
     address: str | None = None
     phone: str | None = None
-
     '''
-    pizza_type: str = Field(
-        ...,
-        description="This is the type of pizza the user wants to order.",
-    )
-    address: str = Field(
-        ...,
-        description="This is the address to which the user wants the pizza delivered.",
-    )
-    phone: str = Field(
-        ...,
-        description="This is the telephone number with which to contact the user in case of need.",
-    )
+    
     '''
-
     @field_validator("pizza_type")
     @classmethod
     def validate_pizza_type(cls, pizza_type: str):
@@ -48,59 +67,55 @@ class PizzaOrder(BaseModel):
         if pizza_type is None:
             return
 
-        if pizza_type not in menu:
-            raise ValueError(f"{pizza_type} is not present in the menù")
+        pizza_types = list(menu.keys())
+
+        if pizza_type not in pizza_types:
+            raise ValueError(f"{pizza_type} is not present in the menù (translating everything in {language} language)")
+    '''   
 
 
 # Order pizza start intent
 @tool(return_direct=True)
-def order_pizza(details, cat):
+def start_order_pizza_intent(details, cat):
     '''I would like to order a pizza
-    I'll take a Margherita pizza'''
+    I'll take a pizza'''
 
-    log.critical("INTENT START")
+    log.critical("\n ----------- INTENT START ----------- \n")
 
-    f = Form(model=PizzaOrder(), cat=cat)
-    
-    # update form
-    res = f.update()
+    # create a new conversational form
+    cform = ConversationalForm(model=PizzaOrder(), cat=cat, lang=language)
+    #cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
+    cat.working_memory[KEY] = cform
 
-    log.critical(res)
-
-    if isinstance(res, str):
-        log.critical("VALIDATION ERROR")
-        return res
-
-    if f.is_complete():
-        return f.complete_order()
-    else:
-        cat.working_memory[KEY] = f
-        return f.ask_missing_information()
+    _, response = execute_dialogue(cform, cat)
+    return response
 
 
 # Order pizza stop intent
 @tool()
-def exit_order_pizza(input, cat):
+def stop_order_pizza_intent(input, cat):
     '''I don't want to order pizza anymore, 
     I want to give up on the order, 
     go back to normal conversation'''
 
     del cat.working_memory[KEY]
-    log.critical("INTENT STOP")
+    log.critical("\n ----------- INTENT STOP ----------- \n")
     return input
 
 
 # Get pizza menu
 @tool()
-def pizza_menu(input, cat):
+def ask_menu(input, cat):
     '''What is on the menu?
-    Which types of pizza do you have?'''
+    Which types of pizza do you have?
+    Can I see the pizza menu?
+    I want a menu'''
 
-    log.critical("INTENT MENU")
+    log.critical("\n ----------- INTENT MENU ----------- \n")
     response = "The available pizzas are the following:"
-    for pizza in menu:
-        response += f"\n - {pizza}"
-    response += ", always translate everything in Italian language"
+    for pizza, ingredients in menu.items():
+        response += f"\n - {pizza} with the following ingredients: {ingredients}"
+    response += f", (translating everything in {language} language)"
 
     return response
 
@@ -110,29 +125,62 @@ def pizza_menu(input, cat):
 def agent_fast_reply(fast_reply: Dict, cat) -> Dict:
 
     if KEY not in cat.working_memory.keys():
-        log.critical("NO KEY")
+        log.critical("\n ----------- NO KEY ----------- \n")
         return fast_reply
         
-    log.critical("INTENT ACTIVE")
+    log.critical("\n ----------- INTENT ACTIVE ----------- \n")
 
-    f = cat.working_memory[KEY]
+    cform = cat.working_memory[KEY]
 
-    res = f.update()
-    if isinstance(res, str):
-        return {
-            "output": res
-        }
-    # There is no information in the new message that can update the form
-    elif res is False:
+    is_updated, response = execute_dialogue(cform, cat)
+    if is_updated:
+        return { "output": response }
+    else:
         return
 
-    if f.is_complete():
-        utter = f.complete_order()
+
+# Execute the dialogue
+def execute_dialogue(cform, cat):
+
+    is_updated = True
+    try:
+        is_updated = cform.update_from_user_response()
+    except ValidationError as e:
+        return is_updated, e.errors()[0]["msg"]
+
+    if cform.is_completed():
+        response = execute_action(cform)
         del cat.working_memory[KEY]
     else:
-        cat.working_memory[KEY] = f
-        utter = f.ask_missing_information()
-        
-    return {
-        "output": utter
-    }
+        cat.working_memory[KEY] = cform
+        response = cform.ask_missing_information()
+
+    return is_updated, response
+
+
+# Complete the action
+def execute_action(cform):
+    x = random.randint(0, 6)
+
+    # Crea il nome del file con il formato "pizzaX.jpg"
+    filename = f'pizza{x}.jpg'
+    result = "<h3>PIZZA CHALLENGE - ORDER COMPLETED<h3><br>" 
+    result += "<table border=0>"
+    result += "<tr>"
+    result += "   <td>Pizza Type</td>"
+    result += f"  <td>{cform.model.pizza_type}</td>"
+    result += "</tr>"
+    result += "<tr>"
+    result += "   <td>Address</td>"
+    result += f"  <td>{cform.model.address}</td>"
+    result += "</tr>"
+    result += "<tr>"
+    result += "   <td>Phone Number</td>"
+    result += f"  <td>{cform.model.phone}</td>"
+    result += "</tr>"
+    result += "</table>"
+    result += "<br>"                                                                                                     
+    result += "Thanks for your order.. your pizza is on its way!"
+    result += "<br><br>"
+    result += f"<img style='width:400px' src='https://maxdam.github.io/cat-pizza-challenge/img/order/pizza{random.randint(0, 6)}.jpg'>"
+    return result
