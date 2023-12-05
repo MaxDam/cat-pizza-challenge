@@ -64,7 +64,7 @@ class PizzaOrder(BaseModel):
     def validate_pizza_type(cls, pizza_type: str):
         log.critical("VALIDATIONS")
 
-        if pizza_type is None:
+        if pizza_type in [None, ""]:
             return
 
         pizza_types = list(menu.keys())
@@ -83,8 +83,8 @@ def start_order_pizza_intent(details, cat):
     log.critical("\n ----------- INTENT START ----------- \n")
 
     # create a new conversational form
-    cform = ConversationalForm(model=PizzaOrder(), cat=cat, lang=language)
-    #cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
+    #cform = ConversationalForm(model=PizzaOrder(), cat=cat, lang=language)
+    cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
     cat.working_memory[KEY] = cform
 
     _, response = execute_dialogue(cform, cat)

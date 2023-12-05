@@ -68,6 +68,8 @@ class ConversationalForm:
         #user_response_json = self._extract_info_from_scratch()
         #user_response_json = self._extract_info_by_pydantic()
         user_response_json = self._extract_info_by_kor()
+        if user_response_json is None:
+            return
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}
@@ -114,9 +116,13 @@ class ConversationalForm:
         chain = create_extraction_chain(self.cat._llm, schema, encoder_or_encoder_class="json", validator=validator)
         user_message = self.cat.working_memory["user_message_json"]["text"]
         output = chain.run(user_message)["validated_data"]
-        user_response_json = output.dict()
-        print(f'user response json:\n{user_response_json}')
-        return user_response_json
+        try:
+            user_response_json = output.dict()
+            print(f'user response json:\n{user_response_json}')
+            return user_response_json
+        except Exception  as e:
+            print(f"An error occurred: {e}")
+            return None
 
 
     # Extracted new informations from the user's response (from sratch)
@@ -158,8 +164,3 @@ class ConversationalForm:
         user_response_json = json.loads(json_str)
         print(f'user response json:\n{user_response_json}')
         return user_response_json
-
-
-# TODO:
-# https://www.askmarvin.ai/welcome/what_is_marvin/
-# https://github.com/jxnl/instructor
