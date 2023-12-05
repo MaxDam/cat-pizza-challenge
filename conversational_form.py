@@ -65,9 +65,11 @@ class ConversationalForm:
     def update_from_user_response(self):
 
         # Extract new info
-        #user_response_json = self._extract_info_from_scratch()
-        #user_response_json = self._extract_info_by_pydantic()
-        user_response_json = self._extract_info_by_kor()
+        user_response_json = self._extract_info_from_scratch()
+        # user_response_json = self._extract_info_by_pydantic()
+        # user_response_json = self._extract_info_by_kor()
+        if user_response_json is None:
+            return
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}
@@ -86,6 +88,7 @@ class ConversationalForm:
         return True
 
 
+    #### PYDANTIC & KOR IMPLEMENTATIONS ####
 
     # Extracted new informations from the user's response (by pydantic)
     def _extract_info_by_pydantic(self):
@@ -110,56 +113,50 @@ class ConversationalForm:
 
     # Extracted new informations from the user's response (by kor)
     def _extract_info_by_kor(self):
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        
         schema, validator = from_pydantic(type(self.model))   
         chain = create_extraction_chain(self.cat._llm, schema, encoder_or_encoder_class="json", validator=validator)
-        user_message = self.cat.working_memory["user_message_json"]["text"]
+        print(f"prompt: {chain.prompt.to_string(user_message)}")
+        
         output = chain.run(user_message)["validated_data"]
-        user_response_json = output.dict()
-        print(f'user response json:\n{user_response_json}')
-        return user_response_json
+        try:
+            user_response_json = output.dict()
+            print(f'user response json:\n{user_response_json}')
+            return user_response_json
+        except Exception  as e:
+            print(f"An error occurred: {e}")
+            return None
 
+
+    #### FROM SCRATCH IMPLEMENTATION ####
 
     # Extracted new informations from the user's response (from sratch)
     def _extract_info_from_scratch(self):
-
-        # Prompt
         user_message = self.cat.working_memory["user_message_json"]["text"]
-        prompt = f"""Update the following JSON with information extracted from the Sentence:
-
-        Sentence: I want to order a pizza
-        JSON:{{
-            "pizza_type": null,
-            "address": null,
-            "phone": null
-        }}
-        UPDATED JSON:{{
-            "pizza_type": null,
-            "address": null,
-            "phone": null
-        }}
-
-        Sentence: I live in Via Roma 1
-        JSON:{{
-            "pizza_type": "Margherita",
-            "address": null,
-            "phone": null
-        }}
-        Updated JSON:{{
-            "pizza_type": "Margherita",
-            "address": "Via Roma 1",
-            "phone": null
-        }}
-
-        Sentence: {user_message}
-        JSON:{self.model.model_dump_json(indent=4)}
-        Updated JSON:"""
-        
+        prompt = self._get_pydantic_prompt(user_message)
+        print(f"prompt: {prompt}")
         json_str = self.cat.llm(prompt)
         user_response_json = json.loads(json_str)
         print(f'user response json:\n{user_response_json}')
         return user_response_json
 
+    # return pydantic prompt based from examples
+    def _get_pydantic_prompt(self, message):
+        prompt_examples = type(self.model).get_prompt_examples()
+        lines = []
+        for example in prompt_examples:
+            lines.append(f"Sentence: {example['sentence']}")
+            lines.append(f"JSON: {self._format_prompt_json(example['json'])}")
+            lines.append(f"Updated JSON: {self._format_prompt_json(example['updatedJson'])}")
+            lines.append("\n")
+        result = "Update the following JSON with information extracted from the Sentence:\n\n"
+        result += "\n".join(lines)
+        result += f"Sentence: {message}\nJSON:{json.dumps(self.model.dict(), indent=4)}\nUpdated JSON:"
+        return result
 
-# TODO:
-# https://www.askmarvin.ai/welcome/what_is_marvin/
-# https://github.com/jxnl/instructor
+    #format json for prompt
+    def _format_prompt_json(self, values):
+        attributes = list(self.model.__annotations__.keys())
+        data_dict = dict(zip(attributes, values))
+        return json.dumps(data_dict, indent=4)

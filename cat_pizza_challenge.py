@@ -24,54 +24,71 @@ menu = {
 }
 
 
-# Pizza order object
+# Pizza order object (from scratch implementation)
 class PizzaOrder(BaseModel):
 
-    pizza_type: str = Field(
-        default=None,
-        description="This is the type of pizza the user wants to order.",
-        examples=[
-            ("Margherita pizza", "Margherita"),
-            ("I like Capricciosa", "Capricciosa")
-        ],
-    )
-    address: str = Field(
-        default=None,
-        description="This is the address to which the user wants the pizza delivered.",
-        examples=[
-            ("My address is via Pia 22", "via Pia 22"),
-            ("I live in via libertà, number 14", "via libertà 14")
-        ],
-    )
-    phone: str = Field(
-        default=None,
-        description="This is the telephone number with which to contact the user in case of need.",
-        examples=[
-            ("My telephon number is 333123123", "333123123"),
-            ("the number is 3493366443", "3493366443")
-        ],
-    )
-
-    '''
     pizza_type: str | None = None
     address: str | None = None
     phone: str | None = None
-    '''
     
-    '''
     @field_validator("pizza_type")
     @classmethod
     def validate_pizza_type(cls, pizza_type: str):
         log.critical("VALIDATIONS")
 
-        if pizza_type is None:
+        if pizza_type in [None, ""]:
             return
 
         pizza_types = list(menu.keys())
 
         if pizza_type not in pizza_types:
             raise ValueError(f"{pizza_type} is not present in the menù (translating everything in {language} language)")
-    '''   
+
+    @classmethod
+    def get_prompt_examples(cls):
+        return [
+            {
+                "sentence": "I want to order a pizza",
+                "json": [None, None, None],
+                "updatedJson": [None, None, None]
+            },
+            {
+                "sentence": "I live in Via Roma 1",
+                "json": ["Margherita", None, None],
+                "updatedJson": ["Margherita", "Via Roma 1", None]
+            }
+        ]
+
+
+'''
+# Pizza order object (for kor implementation)
+class PizzaOrder(BaseModel):
+
+    pizza_type: str = Field(
+        default=None,
+        description="This is the type of pizza.",
+        examples=[
+            ("I would like a Margherita", "Margherita"),
+            ("I like Capricciosa", "Capricciosa")
+        ],
+    )
+    address: str = Field(
+        default=None,
+        description="This is the address.",
+        examples=[
+            ("My address is via Pia 22", "via Pia 22"),
+            ("I live in Via Roma 1", "Via Roma 1")
+        ],
+    )
+    phone: str = Field(
+        default=None,
+        description="This is the telephone number.",
+        examples=[
+            ("My telephon number is 333123123", "333123123"),
+            ("the number is 3493366443", "3493366443")
+        ],
+    )
+'''    
 
 
 # Order pizza start intent
