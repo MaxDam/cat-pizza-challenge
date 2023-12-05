@@ -62,6 +62,7 @@ class ConversationalForm:
 
 
     # Updates the form with the information extracted from the user's response
+    # (Return True if the model is updated)
     def update_from_user_response(self):
 
         # Extract new info
@@ -69,7 +70,7 @@ class ConversationalForm:
         # user_response_json = self._extract_info_by_pydantic()
         # user_response_json = self._extract_info_by_kor()
         if user_response_json is None:
-            return
+            return False
 
         # Gets a new_model with the new fields filled in
         non_empty_details = {k: v for k, v in user_response_json.items() if v not in [None, ""]}

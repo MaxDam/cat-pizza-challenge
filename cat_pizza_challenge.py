@@ -34,7 +34,7 @@ class PizzaOrder(BaseModel):
     @field_validator("pizza_type")
     @classmethod
     def validate_pizza_type(cls, pizza_type: str):
-        log.critical("VALIDATIONS")
+        log.info("VALIDATIONS")
 
         if pizza_type in [None, ""]:
             return
@@ -149,21 +149,30 @@ def agent_fast_reply(fast_reply: Dict, cat) -> Dict:
 
     cform = cat.working_memory[KEY]
 
-    is_updated, response = execute_dialogue(cform, cat)
-    if is_updated:
+    # Execute the dialogue
+    return_direct, response = execute_dialogue(cform, cat)
+
+    # If return_direct => skip chain and return result
+    if return_direct:
         return { "output": response }
-    else:
-        return
+        
+    return
 
 
 # Execute the dialogue
 def execute_dialogue(cform, cat):
 
-    is_updated = True
+    return_direct = True
     try:
-        is_updated = cform.update_from_user_response()
+        model_is_updated = cform.update_from_user_response()
+        
+        if not model_is_updated: 
+            return_direct = False
+
     except ValidationError as e:
-        return is_updated, e.errors()[0]["msg"]
+        message = e.errors()[0]["msg"]
+        response = cat.llm(message)
+        return return_direct, response
 
     if cform.is_completed():
         response = execute_action(cform)
@@ -172,7 +181,7 @@ def execute_dialogue(cform, cat):
         cat.working_memory[KEY] = cform
         response = cform.ask_missing_information()
 
-    return is_updated, response
+    return return_direct, response
 
 
 # Complete the action
