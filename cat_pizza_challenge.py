@@ -13,14 +13,14 @@ language = "Italian"
 menu = {
     "Margherita": "Pomodoro, mozzarella fresca, basilico.",
     "Peperoni": "Pomodoro, mozzarella, peperoni.",
-    "Funghi e Prosciutto": "Pomodoro, mozzarella, funghi, prosciutto.",
+    "Romana": "Pomodoro, mozzarella, prosciutto.",
     "Quattro Formaggi": "Gorgonzola, mozzarella, parmigiano, taleggio.",
-    "Capricciosa: Pomodoro": "mozzarella, prosciutto, funghi, carciofi, olive.",
-    "Vegetariana: Pomodoro": "mozzarella, peperoni, cipolla, olive, melanzane.",
-    "Bufalina: Pomodoro": "mozzarella di bufala, pomodorini, basilico.",
-    "Diavola: Pomodoro": "mozzarella, salame piccante, peperoncino.",
+    "Capricciosa": "Pomodoro, mozzarella, prosciutto, funghi, carciofi, olive.",
+    "Vegetariana": "Pomodoro, mozzarella, peperoni, cipolla, olive, melanzane.",
+    "Bufalina": "Pomodoro, mozzarella di bufala, pomodorini, basilico.",
+    "Diavola": "Pomodoro, mozzarella, salame piccante, peperoncino.",
     "Pescatora": "Pomodoro, mozzarella, frutti di mare (cozze, vongole, gamberi).",
-    "Prosciutto e Rucola": "Pomodoro, mozzarella, prosciutto crudo, rucola, scaglie di parmigiano."
+    "Rucola": "Pomodoro, mozzarella, prosciutto crudo, rucola, scaglie di parmigiano."
 }
 
 
@@ -159,35 +159,42 @@ def agent_fast_reply(fast_reply: Dict, cat) -> Dict:
     return
 
 
+# TODO: hook to use instead of agent_fast_reply
+@hook
+def before_cat_reads_message(user_message_json: dict, cat) -> dict:
+    #user_message_json["text"] = "my custom prompt"
+    return user_message_json
+
+
 # Execute the dialogue
 def execute_dialogue(cform, cat):
 
     return_direct = True
     try:
         model_is_updated = cform.update_from_user_response()
-        
-        if not model_is_updated: 
-            return_direct = False
-
+        #if not model_is_updated: return_direct = False
     except ValidationError as e:
         message = e.errors()[0]["msg"]
         response = cat.llm(message)
+        return_direct = True
         return return_direct, response
 
     if cform.is_completed():
-        response = execute_action(cform)
+        return_direct, response = execute_action(cform, cat)
         del cat.working_memory[KEY]
     else:
         cat.working_memory[KEY] = cform
-        response = cform.ask_missing_information()
+        #return_direct, response = cform.ask_missing_information_without_chain()
+        return_direct, response = cform.ask_missing_information_with_chain()
 
     return return_direct, response
 
 
 # Complete the action
-def execute_action(cform):
+def execute_action(cform, cat):
+    return_direct = True
     x = random.randint(0, 6)
-
+    
     # Crea il nome del file con il formato "pizzaX.jpg"
     filename = f'pizza{x}.jpg'
     result = "<h3>PIZZA CHALLENGE - ORDER COMPLETED<h3><br>" 
@@ -209,4 +216,4 @@ def execute_action(cform):
     result += "Thanks for your order.. your pizza is on its way!"
     result += "<br><br>"
     result += f"<img style='width:400px' src='https://maxdam.github.io/cat-pizza-challenge/img/order/pizza{random.randint(0, 6)}.jpg'>"
-    return result
+    return return_direct, result

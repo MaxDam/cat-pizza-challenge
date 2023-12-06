@@ -31,9 +31,9 @@ class ConversationalForm:
         return ask_for
 
 
-    # Queries the llm asking for the missing fields of the form
-    def ask_missing_information(self):
-
+    # Queries the llm asking for the missing fields of the form, without memory chain
+    def ask_missing_information_without_chain(self):
+       
         # Gets the information it should ask the user based on the fields that are still empty
         ask_for = self._check_what_is_empty()
 
@@ -58,8 +58,33 @@ class ConversationalForm:
 
         print(f'ask_missing_information:\n{ask_for}')
         llm_question = self.cat.llm(prompt)
-        return llm_question 
 
+        return_direct = True
+        return return_direct, llm_question 
+
+
+    # Queries the llm asking for the missing fields of the form, using memory chain
+    def ask_missing_information_with_chain(self):
+        
+        # Gets the information it should ask the user based on the fields that are still empty
+        ask_for = self._check_what_is_empty()
+
+        # Prompt
+        prompt = f"""Create a question for the user (translating everything in {self.language} language), 
+        below are some things to ask the user in a conversational and confidential way, to complete the pizza order.
+        You should only ask one question at a time even if you don't get all the information
+        don't ask how to list! Don't say hello to the user! Don't say hi.
+        Explain that you need some information. If the ask_for list is empty, thank them and ask how you can help them
+        ### ask_for list: {ask_for}
+        """
+
+        # Update user message
+        self.cat.working_memory["user_message_json"]["text"] = prompt
+
+        return_direct = False
+        response = None
+        return return_direct, response
+    
 
     # Updates the form with the information extracted from the user's response
     # (Return True if the model is updated)
