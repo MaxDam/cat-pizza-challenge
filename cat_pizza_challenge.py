@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import enum
 from typing import Dict, Optional
 from cat.log import log
-from .conversational_form import ConversationalForm
+from .conversational_form import ConversationalForm, CFormState
 import random
 
 KEY = "pizza_challenge"
@@ -13,14 +13,14 @@ language = "Italian"
 menu = {
     "Margherita": "Pomodoro, mozzarella fresca, basilico.",
     "Peperoni": "Pomodoro, mozzarella, peperoni.",
-    "Funghi e Prosciutto": "Pomodoro, mozzarella, funghi, prosciutto.",
+    "Romana": "Pomodoro, mozzarella, prosciutto.",
     "Quattro Formaggi": "Gorgonzola, mozzarella, parmigiano, taleggio.",
-    "Capricciosa: Pomodoro": "mozzarella, prosciutto, funghi, carciofi, olive.",
-    "Vegetariana: Pomodoro": "mozzarella, peperoni, cipolla, olive, melanzane.",
-    "Bufalina: Pomodoro": "mozzarella di bufala, pomodorini, basilico.",
-    "Diavola: Pomodoro": "mozzarella, salame piccante, peperoncino.",
+    "Capricciosa": "Pomodoro, mozzarella, prosciutto, funghi, carciofi, olive.",
+    "Vegetariana": "Pomodoro, mozzarella, peperoni, cipolla, olive, melanzane.",
+    "Bufalina": "Pomodoro, mozzarella di bufala, pomodorini, basilico.",
+    "Diavola": "Pomodoro, mozzarella, salame piccante, peperoncino.",
     "Pescatora": "Pomodoro, mozzarella, frutti di mare (cozze, vongole, gamberi).",
-    "Prosciutto e Rucola": "Pomodoro, mozzarella, prosciutto crudo, rucola, scaglie di parmigiano."
+    "Rucola": "Pomodoro, mozzarella, prosciutto crudo, rucola, scaglie di parmigiano."
 }
 
 
@@ -42,7 +42,7 @@ class PizzaOrder(BaseModel):
         pizza_types = list(menu.keys())
 
         if pizza_type not in pizza_types:
-            raise ValueError(f"{pizza_type} is not present in the menù (translating everything in {language} language)")
+            raise ValueError(f"{pizza_type} is not present in the menù")
 
     @classmethod
     def get_prompt_examples(cls):
@@ -91,20 +91,95 @@ class PizzaOrder(BaseModel):
 '''    
 
 
+# Get pizza menu
+@tool()
+def ask_menu(input, cat):
+    '''What is on the menu?
+    Which types of pizza do you have?
+    Can I see the pizza menu?
+    I want a menu'''
+
+    log.critical("INTENT ORDER PIZZA MENU")
+    # if the intent is active..
+    if KEY in cat.working_memory.keys():
+        # return menu
+        response = "The available pizzas are the following:"
+        for pizza, ingredients in menu.items():
+            response += f"\n - {pizza} with the following ingredients: {ingredients}"
+        return response
+
+    return input
+
+
 # Order pizza start intent
 @tool(return_direct=True)
 def start_order_pizza_intent(details, cat):
     '''I would like to order a pizza
     I'll take a pizza'''
 
-    log.critical("\n ----------- INTENT START ----------- \n")
+    log.critical("INTENT ORDER PIZZA START")
 
-    # create a new conversational form
-    cform = ConversationalForm(model=PizzaOrder(), cat=cat, lang=language)
-    #cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat, lang=language)
+    if KEY in cat.working_memory.keys():
+        del cat.working_memory[KEY]
+
+    # create a new conversational form, and save it in working memory
+    cform = ConversationalForm(model=PizzaOrder(), cat=cat)
+    #cform = ConversationalForm(model=PizzaOrder(pizza_type='', address='', phone=''), cat=cat)
     cat.working_memory[KEY] = cform
 
-    _, response = execute_dialogue(cform, cat)
+    # Execute the dialogue and return the response
+    response = execute_dialogue(cform, cat)
+    return response
+
+
+# Acquires user information through a dialogue with the user
+@hook
+def agent_fast_reply(fast_reply: Dict, cat) -> Dict:
+
+    # if the intent is active..
+    if KEY in cat.working_memory.keys():        
+        log.critical("INTENT ORDER PIZZA ACTIVE")
+        cform = cat.working_memory[KEY]
+
+        # Execute the dialogue and return the response
+        response = execute_dialogue(cform, cat)
+        return { "output": response }
+        
+    return fast_reply
+
+
+# Execute the dialogue
+def execute_dialogue(cform, cat):
+    try:
+        # update form from user response
+        model_is_updated = cform.update_from_user_response()
+        
+        # if the form was updated, save it in working memory
+        if model_is_updated:
+            cat.working_memory[KEY] = cform
+
+    except ValidationError as e:
+        # If there was a validation problem, return the error message
+        message = e.errors()[0]["msg"]
+        response = cat.llm(message)
+        return response
+
+    log.warning(f"state:{cform.state}, is completed:{cform.is_completed()}")
+
+    # Checks whether it should execute the action
+    if cform.state == CFormState.ASK_SUMMARY:
+        if cform.check_confirm():
+            response = execute_action(cform)
+            del cat.working_memory[KEY]
+            return response
+    
+    # Checks whether the form is completed
+    if cform.state == CFormState.ASK_INFORMATIONS and cform.is_completed():
+        response = cform.show_summary(cat)
+        return response
+
+    # If the form is not completed, ask for missing information
+    response = cform.ask_missing_information()
     return response
 
 
@@ -115,79 +190,32 @@ def stop_order_pizza_intent(input, cat):
     I want to give up on the order, 
     go back to normal conversation'''
 
-    del cat.working_memory[KEY]
-    log.critical("\n ----------- INTENT STOP ----------- \n")
+    log.critical("INTENT ORDER PIZZA STOP")
+        
+    # if the key exists delete it
+    if KEY in cat.working_memory.keys():
+        del cat.working_memory[KEY]
+    
     return input
 
 
-# Get pizza menu
-@tool()
-def ask_menu(input, cat):
-    '''What is on the menu?
-    Which types of pizza do you have?
-    Can I see the pizza menu?
-    I want a menu'''
-
-    log.critical("\n ----------- INTENT MENU ----------- \n")
-    response = "The available pizzas are the following:"
-    for pizza, ingredients in menu.items():
-        response += f"\n - {pizza} with the following ingredients: {ingredients}"
-    response += f", (translating everything in {language} language)"
-
-    return response
-
-
-# Acquires user information through a dialogue with the user
-@hook
-def agent_fast_reply(fast_reply: Dict, cat) -> Dict:
-
-    if KEY not in cat.working_memory.keys():
-        log.critical("\n ----------- NO KEY ----------- \n")
-        return fast_reply
-        
-    log.critical("\n ----------- INTENT ACTIVE ----------- \n")
-
-    cform = cat.working_memory[KEY]
-
-    # Execute the dialogue
-    return_direct, response = execute_dialogue(cform, cat)
-
-    # If return_direct => skip chain and return result
-    if return_direct:
-        return { "output": response }
-        
-    return
-
-
-# Execute the dialogue
-def execute_dialogue(cform, cat):
-
-    return_direct = True
-    try:
-        model_is_updated = cform.update_from_user_response()
-        
-        if not model_is_updated: 
-            return_direct = False
-
-    except ValidationError as e:
-        message = e.errors()[0]["msg"]
-        response = cat.llm(message)
-        return return_direct, response
-
-    if cform.is_completed():
-        response = execute_action(cform)
-        del cat.working_memory[KEY]
-    else:
-        cat.working_memory[KEY] = cform
-        response = cform.ask_missing_information()
-
-    return return_direct, response
+# Hook the main prompt prefix
+@hook()
+def agent_prompt_prefix(prefix, cat) -> str:
+    # if the intent is active change prompt prefix
+    if KEY in cat.working_memory.keys():
+        prefix = """you have to behave like a professional waiter taking orders for a pizzeria, 
+        always you have to appear cordial but friendly, 
+        you must use informal language with the customer;
+        translating everything in {language} language.
+        """
+    return prefix
 
 
 # Complete the action
 def execute_action(cform):
     x = random.randint(0, 6)
-
+    
     # Crea il nome del file con il formato "pizzaX.jpg"
     filename = f'pizza{x}.jpg'
     result = "<h3>PIZZA CHALLENGE - ORDER COMPLETED<h3><br>" 

@@ -1,17 +1,22 @@
 import json
 from cat.log import log
-from langchain.chains import create_tagging_chain_pydantic
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 from pydantic import BaseModel
 from kor import create_extraction_chain, from_pydantic, Object, Text
+from enum import Enum
+
+class CFormState(Enum):
+    ASK_INFORMATIONS    = 0
+    ASK_SUMMARY         = 1
+    EXECUTE_ACTION      = 2
 
 class ConversationalForm:
 
-    def __init__(self, model, cat, lang):
+    def __init__(self, model, cat):
         self.model = model
         self.cat = cat
-        self.language = lang
+        self.state = CFormState.ASK_INFORMATIONS
 
 
     # Check if the form is completed
@@ -31,13 +36,13 @@ class ConversationalForm:
         return ask_for
 
 
-    # Queries the llm asking for the missing fields of the form
-    def ask_missing_information(self):
-
+    # Queries the llm asking for the missing fields of the form, without memory chain
+    def ask_missing_information(self) -> str:
+       
         # Gets the information it should ask the user based on the fields that are still empty
         ask_for = self._check_what_is_empty()
 
-        prefix = self.cat.mad_hatter.execute_hook("agent_prompt_prefix",'')
+        prefix = self.cat.mad_hatter.execute_hook("agent_prompt_prefix", '', cat=self.cat)
         user_message = self.cat.working_memory["user_message_json"]["text"]
         chat_history = self.cat.agent_manager.agent_prompt_chat_history(
             self.cat.working_memory["history"]
@@ -45,20 +50,69 @@ class ConversationalForm:
         
         # Prompt
         prompt = f"""{prefix}
-        Create a question for the user (translating everything in {self.language} language), 
+        Create a question for the user, 
         below are some things to ask the user in a conversational and confidential way, to complete the pizza order.
         You should only ask one question at a time even if you don't get all the information
         don't ask how to list! Don't say hello to the user! Don't say hi.
-        Explain that you need some information. If the ask_for list is empty, thank them and ask how you can help them
+        Explain that you need some information. If the ask_for list is empty, thank them and ask how you can help them.
+        Don't present the conversation history but just a question.
         ### ask_for list: {ask_for}
-        {chat_history}
-        Human: {user_message}
-        AI: 
-        """
+        ## Conversation until now:{chat_history}
+        - Human: {user_message}
+        - AI: """
 
-        print(f'ask_missing_information:\n{ask_for}')
-        llm_question = self.cat.llm(prompt)
-        return llm_question 
+        log.warning(f'MISSING INFORMATIONS: {ask_for}')
+        response = self.cat.llm(prompt)
+
+        return response 
+
+    # Show summary of the form to the user
+    def show_summary(self, cat):
+        prefix = self.cat.mad_hatter.execute_hook("agent_prompt_prefix", '', cat=self.cat)
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        chat_history = self.cat.agent_manager.agent_prompt_chat_history(
+            self.cat.working_memory["history"]
+        )
+        
+        # Prompt
+        prompt = f"""show the summary of the data in the completed form and ask the user if they are correct. 
+        Don't ask irrelevant questions. 
+        Try to be precise and detailed in describing the form and what you need to know.
+        ### form data: {self.model}
+        ## Conversation until now:{chat_history}
+        - Human: {user_message}
+        - AI: """
+
+        # Change status
+        self.state = CFormState.ASK_SUMMARY
+
+        # Queries the LLM
+        response = self.cat.llm(prompt)
+        log.debug(f'show_summary: {response}')
+        return response
+
+
+    # Check user confirm the form data
+    def check_confirm(self) -> bool:
+        user_message = self.cat.working_memory["user_message_json"]["text"]
+        
+        # Prompt
+        prompt = f"""
+        respond with either YES if the user's message is affirmative 
+        or NO if the user's message is not affirmative
+        - Human: {user_message}
+        - AI: """
+
+        # Queries the LLM and check if user is agree or not
+        response = self.cat.llm(prompt)
+        log.debug(f'check_confirm: {response}')
+        confirm = "YES" in response
+        
+        # If confirmed change status
+        if confirm:
+            self.state = CFormState.EXECUTE_ACTION
+
+        return confirm
 
 
     # Updates the form with the information extracted from the user's response
@@ -85,7 +139,8 @@ class ConversationalForm:
 
         # Overrides the current model with the new_model
         self.model = self.model.model_construct(**new_model.model_dump())
-        print(f'updated model:\n{self.model.model_dump_json(indent=4)}')
+        #print(f'updated model:\n{self.model.model_dump_json(indent=4)}')
+        log.critical(f'MODEL : {self.model.model_dump_json()}')
         return True
 
 
@@ -99,16 +154,16 @@ class ConversationalForm:
             input_variables=["query"],
             partial_variables={"format_instructions": parser.get_format_instructions()},
         )
-        print(f'get_format_instructions:\n{parser.get_format_instructions()}')
+        log.debug(f'get_format_instructions: {parser.get_format_instructions()}')
         
         user_message = self.cat.working_memory["user_message_json"]["text"]
         _input = prompt.format_prompt(query=user_message)
         output = self.cat.llm(_input.to_string())
-        print(f"output: {output}")
+        log.debug(f"output: {output}")
 
         #user_response_json = parser.parse(output).dict()
         user_response_json = json.loads(output)
-        print(f'user response json:\n{user_response_json}')
+        log.debug(f'user response json: {user_response_json}')
         return user_response_json
 
 
@@ -118,15 +173,15 @@ class ConversationalForm:
         
         schema, validator = from_pydantic(type(self.model))   
         chain = create_extraction_chain(self.cat._llm, schema, encoder_or_encoder_class="json", validator=validator)
-        print(f"prompt: {chain.prompt.to_string(user_message)}")
+        log.debug(f"prompt: {chain.prompt.to_string(user_message)}")
         
         output = chain.run(user_message)["validated_data"]
         try:
             user_response_json = output.dict()
-            print(f'user response json:\n{user_response_json}')
+            log.debug(f'user response json: {user_response_json}')
             return user_response_json
         except Exception  as e:
-            print(f"An error occurred: {e}")
+            log.debug(f"An error occurred: {e}")
             return None
 
 
@@ -136,10 +191,10 @@ class ConversationalForm:
     def _extract_info_from_scratch(self):
         user_message = self.cat.working_memory["user_message_json"]["text"]
         prompt = self._get_pydantic_prompt(user_message)
-        print(f"prompt: {prompt}")
+        log.debug(f"prompt: {prompt}")
         json_str = self.cat.llm(prompt)
         user_response_json = json.loads(json_str)
-        print(f'user response json:\n{user_response_json}')
+        log.debug(f'user response json:\n{user_response_json}')
         return user_response_json
 
     # return pydantic prompt based from examples
